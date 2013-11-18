@@ -1,10 +1,9 @@
 package pool
 
 import java.util.concurrent.LinkedBlockingQueue
-import scala.collection.parallel.mutable.{ParHashMap, ParHashSet}
+import scala.collection.parallel.mutable.ParHashMap
 import tasks.Task
 import scala.util.Random
-import scala.collection.mutable
 
 /**
  * Created with IntelliJ IDEA.
@@ -15,20 +14,26 @@ import scala.collection.mutable
 class ThreadPool(t : Int) {
   val _tasks_queue   = new LinkedBlockingQueue[Task]()
   val _task_notifer  = new Object()
-  val _threads_state = mutable.HashMap.empty[PoolThread, Boolean]
+  val _threads_state = ParHashMap.empty[PoolThread, Boolean]
   val _tasks_mapping = ParHashMap.empty[Int, PoolThread]
   val _timeout       = t
 
   def this(n : Int, t : Int) = {
     this(t)
     (0 to n).foreach(i => {
-      println(i)
       val th = new PoolThread(true, this)
       th.start()
     })
   }
 
   def addTask(task : Runnable) : Int = {
+    // Unstuck elements in queue if any
+    if (!_tasks_queue.isEmpty) {
+      _task_notifer.synchronized {
+        _task_notifer.notify()
+      }
+    }
+
     val ihandle = Random.nextInt(65536)
     if (_threads_state.forall{case (_, v) => v}) {
       val th = new PoolThread(false, this)
@@ -51,6 +56,10 @@ class ThreadPool(t : Int) {
   def timeout : Int = _timeout
 
   def size : Int = _threads_state.size
+
+  def queue : LinkedBlockingQueue[Task] = _tasks_queue
+
+  def killall() : Unit = _tasks_mapping.foreach{case (handle, _) => killTask(handle)}
 
   private[pool] def addThread(thread : PoolThread) : Unit = {
     _threads_state += (thread -> false)
