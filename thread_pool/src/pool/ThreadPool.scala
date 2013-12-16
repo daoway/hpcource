@@ -20,7 +20,7 @@ class ThreadPool(t : Int) {
 
   def this(n : Int, t : Int) = {
     this(t)
-    (0 to n).foreach(i => {
+    (0 until n).foreach(i => {
       val th = new PoolThread(true, this)
       th.start()
     })
